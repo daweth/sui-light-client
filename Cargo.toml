@@ -6,4 +6,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hyper = "0.14.26"
+anyhow = "1.0.70"
+hyper = { version="0.14.26", features=["full"] }
+tokio = { version="1.27.0", features=["full"] }
+async-trait = "0.1.68"
+hyper-tls = "0.5.0"
+hex = "0.4.3"
+serde_json = "1.0.96"
+
+sui-json-rpc-types = { git = "https://github.com/MystenLabs/sui", rev="d6ebeaa32137d4768f97dde14ab04f51d86226b7"}
+sui-types = { git = "https://github.com/MystenLabs/sui", rev="d6ebeaa32137d4768f97dde14ab04f51d86226b7"}
+sui-transaction-builder = { git = "https://github.com/MystenLabs/sui", rev="d6ebeaa32137d4768f97dde14ab04f51d86226b7"}
+move-core-types = { git = "https://github.com/move-language/move", rev = "60cec12b1ed9382836aa4c141e445656d39375e1", features = ["address32"] }
+
