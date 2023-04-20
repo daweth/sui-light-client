@@ -1,5 +1,5 @@
 # sui-light-client
 
-A barebones, read-only client implementation for sui.
+A barebones, read-only JSON RPC client implementation for sui.
 
 
