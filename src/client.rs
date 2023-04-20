@@ -27,7 +27,7 @@ pub struct SuiLightClient {
 }
 
 impl SuiLightClient {
-    fn init(u: String) -> Self {
+    pub fn init(u: String) -> Self {
         let url = u.parse::<Uri>().unwrap();
 
         let client = Client::builder().build::<_, Body>(HttpsConnector::new());
@@ -38,11 +38,11 @@ impl SuiLightClient {
         }
     }
 
-    fn http(&self) -> &Client<HttpsConnector<HttpConnector>> {
+    pub fn http(&self) -> &Client<HttpsConnector<HttpConnector>> {
         &self.http
     }
 
-    fn uri(&self) -> &Uri {
+    pub fn uri(&self) -> &Uri {
         &self.uri
     }
 
