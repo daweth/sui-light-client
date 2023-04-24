@@ -1,10 +1,9 @@
 use std::{fmt::format, str::FromStr};
 
 use async_trait::async_trait;
-use hyper::{
-    client::connect::HttpConnector, server::conn::Http, Body, Client, Method, Request, Response,
-    Uri,
-};
+use serde_json::Value;
+
+use hyper::{Client, Request, Body, Uri, client::HttpConnector, Method};
 use hyper_tls::HttpsConnector;
 
 use move_core_types::{
@@ -43,7 +42,7 @@ pub struct SuiLightClient {
 
 impl SuiLightClient {
     pub fn init(u: String) -> Self {
-        let url = u.parse::<Uri>().unwrap();
+        let url = u.as_str().parse::<Uri>().unwrap();
 
         let client = Client::builder().build::<_, Body>(HttpsConnector::new());
 
@@ -71,7 +70,7 @@ impl DataReader for SuiLightClient {
     ) -> Result<Vec<ObjectInfo>, anyhow::Error> {
         let addr = format!("0x{}", short_str_lossless(address.to_inner()));
 
-        let request_body = Body::from(format!(
+        let json_request_string = format!(
             r#"
            {{
                "jsonrpc": "2.0",
@@ -80,15 +79,26 @@ impl DataReader for SuiLightClient {
                "params": [{}]
            }}"#,
             addr
-        ));
+        );
+
+        let json_value = serde_json::json!(json_request_string);
+
 
         let r = Request::builder()
-            .method(Method::GET)
+            .method(Method::POST)
+            .header("Content-Type", "application/json")
             .uri(&self.uri)
-            .body(request_body)
+            .body(Body::from(json_request_string))
+//            .body(Body::empty())
             .expect("request builder");
 
         let res = self.http.request(r).await?;
+        if res.status() != 200 {
+            let body = hyper::body::to_bytes(res.into_body()).await.unwrap();
+            panic!("The request failed! {:?}", body);
+        }
+
+        dbg!(res.body());
 
         Ok(parse_object_info_from_response(res.into_body()))
     }
@@ -98,7 +108,7 @@ impl DataReader for SuiLightClient {
         object_id: ObjectID,
         options: SuiObjectDataOptions,
     ) -> Result<SuiObjectResponse, anyhow::Error> {
-        let body = Body::from(format!(
+        let json_request_string = format!(
             r#"{{ 
               "jsonrpc": "2.0", 
               "id": 1, 
@@ -124,45 +134,57 @@ impl DataReader for SuiLightClient {
             options.show_content,
             options.show_bcs,
             options.show_storage_rebate
-        ));
+        );
+
+        let json_value = serde_json::json!(json_request_string);
 
         let r = Request::builder()
-            .method(Method::GET)
+            .method(Method::POST)
+            .header("Content-Type", "application/json")
             .uri(&self.uri)
-            .body(body)
+            .body(Body::from(json_request_string))
+//            .body(Body::empty())
             .expect("request builder");
 
         let res = self.http.request(r).await?;
         if res.status() != 200 {
-            panic!("failed");
+            let body = hyper::body::to_bytes(res.into_body()).await.unwrap();
+            panic!("The request failed! {:?}", body);
         }
-        dbg!(&res);
+
+        dbg!(res.body());
 
         Ok(parse_object_from_response(res.into_body()))
     }
 
     async fn get_reference_gas_price(&self) -> Result<u64, anyhow::Error> {
-        let body = Body::from(format!(
+        let json_request_string = format!(
             r#"
-        {{
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "suix_getReferenceGasPrice"
-        }}
-        "#
-        ));
+            {{
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "suix_getReferenceGasPrice"
+            }}
+            "#
+        );
+
+        let json_value = serde_json::json!(json_request_string);
 
         let r = Request::builder()
-            .method(Method::GET)
+            .method(Method::POST)
+            .header("Content-Type", "application/json")
             .uri(&self.uri)
-            .body(body)
+            .body(Body::from(json_request_string))
+//            .body(Body::empty())
             .expect("request builder");
 
         let res = self.http.request(r).await?;
         if res.status() != 200 {
-            panic!("failed")
+            let body = hyper::body::to_bytes(res.into_body()).await.unwrap();
+            panic!("The request failed! {:?}", body);
         }
-        dbg!(&res);
+
+        dbg!(res.body());
 
         Ok(parse_gas_from_response(res.into_body()))
     }
@@ -232,7 +254,6 @@ fn parse_object_from_response(input: Body) -> SuiObjectResponse {
 }
 
 fn parse_object_info_from_response(input: Body) -> Vec<ObjectInfo> {
-    //    let objects = serde_json::from_str(input);
 
     let mut fake_type_tags = Vec::<TypeTag>::new();
     fake_type_tags.insert(0, TypeTag::Bool);
@@ -263,7 +284,7 @@ fn parse_object_info_from_response(input: Body) -> Vec<ObjectInfo> {
 }
 
 fn parse_gas_from_response(input: Body) -> u64 {
-    420
+    69
 }
 
 fn short_str_lossless(b: [u8; SUI_ADDRESS_LENGTH]) -> String {
@@ -273,4 +294,41 @@ fn short_str_lossless(b: [u8; SUI_ADDRESS_LENGTH]) -> String {
     } else {
         hex_str
     }
+}
+#[cfg(test)]
+mod tests {
+    use hyper::Uri;
+    use sui_types::base_types::ObjectID;
+    use sui_transaction_builder::DataReader;
+
+    use crate::client::{SuiLightClient, DEFAULT_OPTIONS};
+
+    async fn init() -> SuiLightClient{
+        let rpc_url = String::from("https://sui-testnet-rpc.allthatnode.com");
+        let client = SuiLightClient::init(rpc_url.clone());
+        assert_eq!(client.uri().clone(), rpc_url.parse::<Uri>().unwrap());
+        client
+    }
+
+    #[tokio::test]
+    async fn test_get_reference_gas_price() {
+        let client = init().await;
+
+        let gas = client.get_reference_gas_price().await.unwrap();
+
+        assert_eq!(gas, 69, "gas does not match");
+    }
+
+    #[tokio::test]
+    async fn test_get_object_with_options() {
+        let client = init().await;
+        let object_id = ObjectID::from_hex_literal("0x018e1ba15a075b88a61c73d8f48313041422d5e8ce7bfed96f5eeb7ae11e7ef6").unwrap();
+
+        let object = client.get_object_with_options(object_id, DEFAULT_OPTIONS.clone())
+            .await 
+            .unwrap();
+
+        dbg!(object);
+    }
+
 }
